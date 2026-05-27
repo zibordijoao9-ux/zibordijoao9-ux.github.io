@@ -23,6 +23,8 @@
 </head>
 <body>
   <div id="root"></div>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -43,6 +45,30 @@ const MONTHS_F=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","A
 const CAT_L={materia_prima:"Matéria-Prima",embalagem:"Embalagem",ferramentas:"Ferramentas",marketing:"Marketing",transporte:"Transporte",outros:"Outros"};
 
 const uid=()=>Math.random().toString(36).slice(2,9);
+
+// ── Firebase Setup ──────────────────────────────────────────────────────────
+const FB_CONFIG={
+  apiKey:"AIzaSyBmUDNJebQ2sDQKBj7UVQiYhmE-fo_TYAs",
+  authDomain:"jb-manager-4b5a9.firebaseapp.com",
+  projectId:"jb-manager-4b5a9",
+  storageBucket:"jb-manager-4b5a9.firebasestorage.app",
+  messagingSenderId:"594262100196",
+  appId:"1:594262100196:web:6ed3cba4092e1820f904f1"
+};
+const fbApp=firebase.initializeApp(FB_CONFIG);
+const db=firebase.firestore(fbApp);
+const FB_DOC=db.collection("appData").doc("main");
+
+// Remove fotos antes de salvar no Firestore (evita exceder 1MB)
+const stripPhotos=s=>({...s,
+  products:s.products.map(p=>({...p,photo:undefined})),
+  materials:s.materials.map(m=>({...m,photo:undefined})),
+});
+// Restaura fotos locais após carregar do Firestore
+const mergePhotos=(remote,local)=>({...remote,
+  products:remote.products.map(p=>({...p,photo:local?.products?.find(lp=>lp.id===p.id)?.photo||null})),
+  materials:remote.materials.map(m=>({...m,photo:local?.materials?.find(lm=>lm.id===m.id)?.photo||null})),
+});
 const fmtR=n=>`R$ ${Number(n||0).toFixed(2)}`;
 const fmtD=iso=>new Date(iso).toLocaleDateString("pt-BR");
 const isoNow=()=>new Date().toISOString();
@@ -1557,27 +1583,62 @@ function MaisTab({state,actions}){
 function App(){
   const [tab,setTab]=useState("painel");
   const [state,setState]=useState(null);
+  const [syncing,setSyncing]=useState(false);
+  const isRemote=React.useRef(false);
+  const saveTimer=React.useRef(null);
 
+  // Carrega do Firestore (ou localStorage como fallback) e inicia listener em tempo real
   useEffect(()=>{
+    let unsub=null;
     (async()=>{
-      try{
-        const raw=localStorage.getItem("gestao_v2");
-        setState(raw?{...DEMO,...JSON.parse(raw)}:DEMO);
-      }catch{setState(DEMO);}
+      // Tenta carregar do localStorage primeiro (offline fallback)
+      let localState=null;
+      try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);}catch{}
+
+      // Inicia listener em tempo real do Firestore
+      unsub=FB_DOC.onSnapshot(snap=>{
+        if(snap.exists()){
+          const remote=snap.data();
+          isRemote.current=true;
+          setState(prev=>{
+            const merged=mergePhotos(remote,prev||localState);
+            try{localStorage.setItem("gestao_v2",JSON.stringify(merged));}catch{}
+            return{...DEMO,...merged};
+          });
+        }else{
+          // Primeiro uso — salva DEMO no Firestore
+          const initial=localState||DEMO;
+          FB_DOC.set(stripPhotos(initial)).catch(()=>{});
+          setState({...DEMO,...(localState||{})});
+        }
+      },err=>{
+        console.warn("Firebase offline, usando localStorage",err);
+        setState({...DEMO,...(localState||{})});
+      });
     })();
+    return()=>{if(unsub)unsub();};
   },[]);
 
+  // Salva no Firestore ao mudar estado (debounce 1s, ignora updates remotos)
   useEffect(()=>{
     if(!state)return;
-    try{localStorage.setItem("gestao_v2",JSON.stringify(state));}catch(e){}
+    if(isRemote.current){isRemote.current=false;return;}
+    try{localStorage.setItem("gestao_v2",JSON.stringify(state));}catch{}
+    clearTimeout(saveTimer.current);
+    setSyncing(true);
+    saveTimer.current=setTimeout(()=>{
+      FB_DOC.set(stripPhotos(state))
+        .then(()=>setSyncing(false))
+        .catch(()=>setSyncing(false));
+    },1000);
   },[state]);
 
   if(!state)return(
     <div style={{background:C.bg,color:C.fg,height:"100vh",display:"flex",flexDirection:"column",
       justifyContent:"center",alignItems:"center",fontFamily:"system-ui,sans-serif",gap:12}}>
       <div style={{fontSize:32}}>📦</div>
-      <div style={{fontSize:18,fontWeight:700,color:C.p}}>Gestão de Encomendas</div>
-      <div style={{fontSize:13,color:C.mfg}}>Carregando...</div>
+      <div style={{fontSize:18,fontWeight:700,color:C.p}}>JB Manager</div>
+      <div style={{fontSize:13,color:C.mfg}}>Conectando...</div>
     </div>
   );
 
@@ -1638,6 +1699,14 @@ function App(){
       <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
         {renderTab()}
       </div>
+      {syncing&&(
+        <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",
+          width:"100%",maxWidth:430,zIndex:200,pointerEvents:"none"}}>
+          <div style={{background:C.p,color:"#fff",fontSize:11,textAlign:"center",padding:"3px 0",fontWeight:600}}>
+            ☁️ Sincronizando...
+          </div>
+        </div>
+      )}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",
         maxWidth:430,background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:100}}>
         {tabs.map(t=>(
