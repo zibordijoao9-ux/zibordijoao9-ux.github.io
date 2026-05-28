@@ -1638,13 +1638,20 @@ function App(){
   const saveTimer=React.useRef(null);
   const dataUnsub=React.useRef(null);
 
-  // Listener de autenticação — aguarda redirect result antes de tudo
   useEffect(()=>{
-    const setupData=u=>{
+    let authUnsub=null;
+    let snapUnsub=null;
+
+    const startData=()=>{
       let localState=null;
       try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);}catch{}
-      if(dataUnsub.current){dataUnsub.current();dataUnsub.current=null;}
-      dataUnsub.current=FB_DOC.onSnapshot(snap=>{
+      // Timeout: se Firestore demorar >5s, usa localStorage
+      const fallback=setTimeout(()=>{
+        if(!state)setState({...DEMO,...(localState||{})});
+      },5000);
+      if(snapUnsub){snapUnsub();snapUnsub=null;}
+      snapUnsub=FB_DOC.onSnapshot(snap=>{
+        clearTimeout(fallback);
         if(snap.exists()){
           const remote=snap.data();
           isRemote.current=true;
@@ -1654,42 +1661,41 @@ function App(){
             return{...DEMO,...merged};
           });
         }else{
+          clearTimeout(fallback);
           const initial=localState||DEMO;
           FB_DOC.set(stripPhotos(initial)).catch(()=>{});
           setState({...DEMO,...(localState||{})});
         }
-      },err=>{
+      },()=>{
+        clearTimeout(fallback);
         setState(prev=>prev||{...DEMO,...(localState||{})});
       });
     };
 
-    // Primeiro processa o redirect result, depois inicia o listener
+    // Processa redirect pendente
     auth.getRedirectResult()
-      .then(r=>{if(r?.user||!r)sessionStorage.removeItem("jb_pending_login");})
-      .catch(()=>sessionStorage.removeItem("jb_pending_login"))
-      .finally(()=>{
-        const unsub=auth.onAuthStateChanged(async u=>{
-          if(!u){
-            // Se estamos voltando de um redirect, aguarda o getRedirectResult
-            if(sessionStorage.getItem("jb_pending_login"))return;
-            setUser(null);setState(null);
-            if(dataUnsub.current){dataUnsub.current();dataUnsub.current=null;}
-            return;
-          }
-          if(!ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes(u.email.toLowerCase())){
-            setAuthError(`Acesso negado para ${u.email}.`);
-            await auth.signOut();setUser(null);return;
-          }
-          sessionStorage.removeItem("jb_pending_login");
-          setUser(u);setAuthError("");
-          setupData(u);
-        });
-        // Guarda unsub no ref para cleanup
-        dataUnsub._authUnsub=unsub;
-      });
+      .then(()=>sessionStorage.removeItem("jb_pending_login"))
+      .catch(()=>sessionStorage.removeItem("jb_pending_login"));
+
+    authUnsub=auth.onAuthStateChanged(async u=>{
+      if(!u){
+        if(sessionStorage.getItem("jb_pending_login"))return;
+        setUser(null);setState(null);
+        if(snapUnsub){snapUnsub();snapUnsub=null;}
+        return;
+      }
+      if(!ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes(u.email.toLowerCase())){
+        setAuthError(`Acesso negado para ${u.email}.`);
+        await auth.signOut();setUser(null);return;
+      }
+      sessionStorage.removeItem("jb_pending_login");
+      setUser(u);setAuthError("");
+      startData();
+    });
+
     return()=>{
-      if(dataUnsub.current){dataUnsub.current();}
-      if(dataUnsub._authUnsub){dataUnsub._authUnsub();}
+      if(authUnsub)authUnsub();
+      if(snapUnsub)snapUnsub();
     };
   },[]);
 
