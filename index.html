@@ -1589,8 +1589,11 @@ function LoginScreen({onLogin,error}){
   const [loading,setLoading]=useState(false);
   const login=async()=>{
     setLoading(true);
-    try{await auth.signInWithRedirect(googleProvider);}
-    catch(e){setLoading(false);}
+    try{
+      sessionStorage.setItem("jb_pending_login","1");
+      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      await auth.signInWithRedirect(googleProvider);
+    }catch(e){sessionStorage.removeItem("jb_pending_login");setLoading(false);}
   };
   return(
     <div style={{background:C.bg,height:"100vh",display:"flex",flexDirection:"column",
@@ -1662,10 +1665,13 @@ function App(){
 
     // Primeiro processa o redirect result, depois inicia o listener
     auth.getRedirectResult()
-      .catch(()=>{})
+      .then(r=>{if(r?.user||!r)sessionStorage.removeItem("jb_pending_login");})
+      .catch(()=>sessionStorage.removeItem("jb_pending_login"))
       .finally(()=>{
         const unsub=auth.onAuthStateChanged(async u=>{
           if(!u){
+            // Se estamos voltando de um redirect, aguarda o getRedirectResult
+            if(sessionStorage.getItem("jb_pending_login"))return;
             setUser(null);setState(null);
             if(dataUnsub.current){dataUnsub.current();dataUnsub.current=null;}
             return;
@@ -1674,6 +1680,7 @@ function App(){
             setAuthError(`Acesso negado para ${u.email}.`);
             await auth.signOut();setUser(null);return;
           }
+          sessionStorage.removeItem("jb_pending_login");
           setUser(u);setAuthError("");
           setupData(u);
         });
