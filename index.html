@@ -1635,20 +1635,12 @@ function App(){
   const saveTimer=React.useRef(null);
   const dataUnsub=React.useRef(null);
 
-  // Listener de autenticação
+  // Listener de autenticação — aguarda redirect result antes de tudo
   useEffect(()=>{
-    // Processa resultado do redirect (volta após login Google)
-    auth.getRedirectResult().catch(()=>{});
-    const unsub=auth.onAuthStateChanged(async u=>{
-      if(!u){setUser(null);setState(null);if(dataUnsub.current){dataUnsub.current();dataUnsub.current=null;}return;}
-      if(!ALLOWED_EMAILS.includes(u.email)){
-        setAuthError(`Acesso negado para ${u.email}. Entre em contato com o administrador.`);
-        await auth.signOut();setUser(null);return;
-      }
-      setUser(u);setAuthError("");
-      // Inicia listener de dados
+    const setupData=u=>{
       let localState=null;
       try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);}catch{}
+      if(dataUnsub.current){dataUnsub.current();dataUnsub.current=null;}
       dataUnsub.current=FB_DOC.onSnapshot(snap=>{
         if(snap.exists()){
           const remote=snap.data();
@@ -1664,11 +1656,34 @@ function App(){
           setState({...DEMO,...(localState||{})});
         }
       },err=>{
-        console.warn("Firebase offline",err);
-        setState({...DEMO,...(localState||{})});
+        setState(prev=>prev||{...DEMO,...(localState||{})});
       });
-    });
-    return()=>unsub();
+    };
+
+    // Primeiro processa o redirect result, depois inicia o listener
+    auth.getRedirectResult()
+      .catch(()=>{})
+      .finally(()=>{
+        const unsub=auth.onAuthStateChanged(async u=>{
+          if(!u){
+            setUser(null);setState(null);
+            if(dataUnsub.current){dataUnsub.current();dataUnsub.current=null;}
+            return;
+          }
+          if(!ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes(u.email.toLowerCase())){
+            setAuthError(`Acesso negado para ${u.email}.`);
+            await auth.signOut();setUser(null);return;
+          }
+          setUser(u);setAuthError("");
+          setupData(u);
+        });
+        // Guarda unsub no ref para cleanup
+        dataUnsub._authUnsub=unsub;
+      });
+    return()=>{
+      if(dataUnsub.current){dataUnsub.current();}
+      if(dataUnsub._authUnsub){dataUnsub._authUnsub();}
+    };
   },[]);
 
   // Salva no Firestore ao mudar estado (debounce 1s, ignora updates remotos)
