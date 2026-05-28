@@ -1589,7 +1589,7 @@ function LoginScreen({onLogin,error}){
   const [loading,setLoading]=useState(false);
   const login=async()=>{
     setLoading(true);
-    try{await auth.signInWithPopup(googleProvider);}
+    try{await auth.signInWithRedirect(googleProvider);}
     catch(e){setLoading(false);}
   };
   return(
@@ -1637,6 +1637,8 @@ function App(){
 
   // Listener de autenticação
   useEffect(()=>{
+    // Processa resultado do redirect (volta após login Google)
+    auth.getRedirectResult().catch(()=>{});
     const unsub=auth.onAuthStateChanged(async u=>{
       if(!u){setUser(null);setState(null);if(dataUnsub.current){dataUnsub.current();dataUnsub.current=null;}return;}
       if(!ALLOWED_EMAILS.includes(u.email)){
