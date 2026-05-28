@@ -50,7 +50,7 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 // ── Firebase Setup ──────────────────────────────────────────────────────────
 const FB_CONFIG={
   apiKey:"AIzaSyBmUDNJebQ2sDQKBj7UVQiYhmE-fo_TYAs",
-  authDomain:"zibordijoao9-ux.github.io",
+  authDomain:"jb-manager-4b5a9.firebaseapp.com",
   projectId:"jb-manager-4b5a9",
   storageBucket:"jb-manager-4b5a9.firebasestorage.app",
   messagingSenderId:"594262100196",
@@ -1590,10 +1590,17 @@ function LoginScreen({onLogin,error}){
   const login=async()=>{
     setLoading(true);
     try{
-      sessionStorage.setItem("jb_pending_login","1");
       await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      await auth.signInWithRedirect(googleProvider);
-    }catch(e){sessionStorage.removeItem("jb_pending_login");setLoading(false);}
+      await auth.signInWithPopup(googleProvider);
+    }catch(e){
+      // Fallback para redirect se popup bloqueado
+      if(e.code==="auth/popup-blocked"||e.code==="auth/popup-closed-by-user"){
+        sessionStorage.setItem("jb_pending_login","1");
+        await auth.signInWithRedirect(googleProvider);
+      }else{
+        setLoading(false);
+      }
+    }
   };
   return(
     <div style={{background:C.bg,height:"100vh",display:"flex",flexDirection:"column",
