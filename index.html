@@ -1587,36 +1587,26 @@ function App(){
   const isRemote=React.useRef(false);
   const saveTimer=React.useRef(null);
 
-  // Carrega do Firestore (ou localStorage como fallback) e inicia listener em tempo real
   useEffect(()=>{
-    let unsub=null;
-    (async()=>{
-      // Tenta carregar do localStorage primeiro (offline fallback)
-      let localState=null;
-      try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);}catch{}
+    // Carrega localStorage IMEDIATAMENTE - nunca trava na tela de loading
+    let localState=null;
+    try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);}catch{}
+    setState({...DEMO,...(localState||{})});
 
-      // Inicia listener em tempo real do Firestore
-      unsub=FB_DOC.onSnapshot(snap=>{
-        if(snap.exists()){
-          const remote=snap.data();
-          isRemote.current=true;
-          setState(prev=>{
-            const merged=mergePhotos(remote,prev||localState);
-            try{localStorage.setItem("gestao_v2",JSON.stringify(merged));}catch{}
-            return{...DEMO,...merged};
-          });
-        }else{
-          // Primeiro uso — salva DEMO no Firestore
-          const initial=localState||DEMO;
-          FB_DOC.set(stripPhotos(initial)).catch(()=>{});
-          setState({...DEMO,...(localState||{})});
-        }
-      },err=>{
-        console.warn("Firebase offline, usando localStorage",err);
-        setState({...DEMO,...(localState||{})});
-      });
-    })();
-    return()=>{if(unsub)unsub();};
+    // Conecta Firestore em background para sincronizar
+    const unsub=FB_DOC.onSnapshot(snap=>{
+      if(snap.exists()){
+        isRemote.current=true;
+        setState(prev=>{
+          const merged=mergePhotos(snap.data(),prev||localState);
+          try{localStorage.setItem("gestao_v2",JSON.stringify(merged));}catch{}
+          return{...DEMO,...merged};
+        });
+      }else{
+        FB_DOC.set(stripPhotos(localState||DEMO)).catch(()=>{});
+      }
+    },err=>console.warn("Firestore:",err));
+    return()=>unsub();
   },[]);
 
   // Salva no Firestore ao mudar estado (debounce 1s, ignora updates remotos)
