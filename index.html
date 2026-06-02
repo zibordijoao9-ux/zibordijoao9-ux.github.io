@@ -1598,7 +1598,14 @@ function App(){
       if(snap.exists()){
         isRemote.current=true;
         setState(prev=>{
-          const merged=mergePhotos(snap.data(),prev||localState);
+          const remote=snap.data();
+          const base=prev||localState||DEMO;
+          const merged=mergePhotos({
+            ...remote,
+            materials:[...(remote.materials||[]), ...(base.materials||[]).filter(x=>!(remote.materials||[]).some(r=>r.id===x.id))],
+            products:[...(remote.products||[]), ...(base.products||[]).filter(x=>!(remote.products||[]).some(r=>r.id===x.id))],
+            purchases:[...(remote.purchases||[]), ...(base.purchases||[]).filter(x=>!(remote.purchases||[]).some(r=>r.id===x.id))]
+          },base);
           try{localStorage.setItem("gestao_v2",JSON.stringify(merged));}catch{}
           return{...DEMO,...merged};
         });
@@ -1617,7 +1624,7 @@ function App(){
     clearTimeout(saveTimer.current);
     setSyncing(true);
     saveTimer.current=setTimeout(()=>{
-      FB_DOC.set(stripPhotos(state))
+      FB_DOC.set(stripPhotos(state),{merge:true})
         .then(()=>setSyncing(false))
         .catch(()=>setSyncing(false));
     },1000);
@@ -1633,12 +1640,38 @@ function App(){
   );
 
   const update=fn=>setState(s=>fn({...s}));
+  const createExpenseFromProduct=(p,descPrefix="Estoque inicial produto")=>({
+    id:uid(),
+    description:`${descPrefix}: ${p.name}`,
+    category:"materia_prima",
+    amount:(Number(p.productionCost)||0)*(Number(p.stock)||0),
+    date:new Date().toISOString(),
+    supplierName:"",
+    notes:"Lançamento automático"
+  });
   const actions={
     addOrder:o=>update(s=>({...s,orders:[...s.orders,{...o,id:uid()}]})),
     updateOrder:(id,d)=>update(s=>({...s,orders:s.orders.map(o=>o.id===id?{...o,...d}:o)})),
     deleteOrder:id=>update(s=>({...s,orders:s.orders.filter(o=>o.id!==id)})),
-    addProduct:p=>update(s=>({...s,products:[...s.products,{...p,id:uid()}]})),
-    updateProduct:(id,d)=>update(s=>({...s,products:s.products.map(p=>p.id===id?{...p,...d}:p)})),
+    addProduct:p=>update(s=>{
+      const np={...p,id:uid()};
+      const purchases=[...s.purchases];
+      const cost=(Number(np.productionCost)||0)*(Number(np.stock)||0);
+      if(cost>0)purchases.push(createExpenseFromProduct(np));
+      return {...s,products:[...s.products,np],purchases};
+    }),
+    updateProduct:(id,d)=>update(s=>{
+      const oldP=s.products.find(p=>p.id===id);
+      const updated={...oldP,...d};
+      const oldCost=(Number(oldP?.productionCost)||0)*(Number(oldP?.stock)||0);
+      const newCost=(Number(updated.productionCost)||0)*(Number(updated.stock)||0);
+      const diff=newCost-oldCost;
+      const purchases=[...s.purchases];
+      if(diff>0){
+        purchases.push({id:uid(),description:`Ajuste de estoque: ${updated.name}`,category:"materia_prima",amount:diff,date:new Date().toISOString(),supplierName:"",notes:"Lançamento automático"});
+      }
+      return {...s,products:s.products.map(p=>p.id===id?updated:p),purchases};
+    }),
     deleteProduct:id=>update(s=>({...s,products:s.products.filter(p=>p.id!==id)})),
     addMaterial:m=>update(s=>({...s,materials:[...s.materials,{...m,id:uid()}]})),
     updateMaterial:(id,d)=>update(s=>({...s,materials:s.materials.map(m=>m.id===id?{...m,...d}:m)})),
