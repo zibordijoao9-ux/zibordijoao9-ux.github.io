@@ -1060,7 +1060,14 @@ function ProductFormModal({state,actions,editing,onClose}){
   const [showRecipePicker,setShowRecipePicker]=useState(false);
   const [recipeSearch,setRecipeSearch]=useState("");
   const [showDeleteCat,setShowDeleteCat]=useState(false);
-  const pN=parseFloat(price)||0;const cN=parseFloat(cost)||0;
+  const pN=parseFloat(price)||0;
+  const autoCost=recipe.reduce((t,r)=>{
+    const mat=state.materials.find(m=>m.id===r.materialId);
+    if(!mat||!mat.quantity)return t;
+    const unitCost=(parseFloat(mat.totalCost)||0)/(parseFloat(mat.quantity)||1);
+    return t+(unitCost*(parseFloat(r.qty)||0));
+  },0);
+  const cN=autoCost>0?autoCost:(parseFloat(cost)||0);
   const m=pN>0&&cN>0?((pN-cN)/pN)*100:null;
   const mc=m?(m>=40?C.green:m>=20?C.amber:C.red):null;
 
@@ -1114,7 +1121,10 @@ function ProductFormModal({state,actions,editing,onClose}){
         </div>}
       </div>
       <Input label="Preço de venda (R$)" value={price} onChange={setPrice} type="number" placeholder="0.00"/>
-      <Input label="Custo de produção (R$)" value={cost} onChange={setCost} type="number" placeholder="0.00"/>
+      <Input label="Custo de produção manual (opcional)" value={cost} onChange={setCost} type="number" placeholder="Usado apenas se não houver ficha técnica"/>
+      <div style={{background:C.acc,border:`1px solid ${C.p}44`,borderRadius:10,padding:10,color:C.fg,fontSize:13}}>
+        💰 Custo automático calculado pelos insumos: {fmtR(autoCost)}
+      </div>
       {m!==null&&<div style={{display:"flex",alignItems:"center",gap:8,background:mc+"18",border:`1px solid ${mc}44`,borderRadius:10,padding:12}}>
         <span style={{fontSize:14,fontWeight:700,color:mc}}>📈 Margem: {m.toFixed(1)}%</span>
         <span style={{fontSize:12,color:mc+"AA"}}> · Lucro: {fmtR(pN-cN)}/un</span>
