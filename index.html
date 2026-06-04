@@ -1878,15 +1878,24 @@ function MaisTab({state,actions}){
 // ── MAIN APP ────────────────────────────────────────────────────────────────
 function App(){
   const [tab,setTab]=useState("painel");
-  // Carrega estado: usa DEMO como base de produtos/insumos, preserva dados do usuário (pedidos, clientes, compras, metas)
+  // Carrega estado: localStorage é fonte de verdade para tudo.
+  // DEMO só é usado como base na primeira vez (sem nada salvo).
+  // Novos produtos/insumos do DEMO são mesclados sem apagar os existentes.
   const [state,setState]=useState(()=>{
     let saved=null;
     try{const raw=localStorage.getItem("gestao_v2");if(raw)saved=JSON.parse(raw);}catch{}
     if(!saved) return DEMO;
-    // Sempre usa products, materials e categories do DEMO (fonte de verdade do HTML)
-    // Preserva apenas dados dinâmicos do usuário
+    // Mescla produtos do DEMO que ainda não existem no localStorage (novos do HTML)
+    const savedProdIds=new Set((saved.products||[]).map(p=>p.id));
+    const newProds=DEMO.products.filter(p=>!savedProdIds.has(p.id));
+    const savedMatIds=new Set((saved.materials||[]).map(m=>m.id));
+    const newMats=DEMO.materials.filter(m=>!savedMatIds.has(m.id));
     return {
       ...DEMO,
+      products: [...(saved.products||[]), ...newProds],
+      materials: [...(saved.materials||[]), ...newMats],
+      productCategories: saved.productCategories||DEMO.productCategories,
+      materialCategories: saved.materialCategories||DEMO.materialCategories,
       orders: saved.orders||[],
       clients: saved.clients||[],
       suppliers: saved.suppliers||[],
