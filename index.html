@@ -426,7 +426,9 @@ function calcSummary(state,month,year){
     return is+(p?.productionCost||0)*i.quantity;
   },0),0);
   const mPurchases=state.purchases.filter(p=>{const dt=new Date(p.date);return dt.getMonth()===m&&dt.getFullYear()===y;});
-  const despesas=mPurchases.reduce((s,p)=>s+p.amount,0);
+  const despesasCompras=mPurchases.reduce((s,p)=>s+p.amount,0);
+  const despesaInsumos=(state.materials||[]).reduce((s,m)=>s+(m.totalCost||0),0);
+  const despesas=despesasCompras+despesaInsumos;
   const lucroBruto=faturamento-custoTotal;
   const lucroLiquido=lucroBruto-despesas;
   const active=state.orders.filter(o=>o.status!=="entregue"&&o.status!=="cancelado");
@@ -1599,6 +1601,8 @@ function ExtratoTab({state,actions}){
   const entries=useMemo(()=>{
     const saidas=state.purchases.filter(p=>{const d=new Date(p.date);return d.getMonth()===selMonth&&d.getFullYear()===now.getFullYear();})
       .map(p=>({id:p.id,date:p.date,label:p.description||"Gasto",sub:p.supplierName?"Forn: "+p.supplierName:CAT_L[p.category]||p.category,amount:p.amount,type:"saida",purchaseId:p.id}));
+    const totalInsumos=(state.materials||[]).reduce((s,m)=>s+(m.totalCost||0),0);
+    if(totalInsumos>0) saidas.push({id:"insumos_fixos",date:new Date(now.getFullYear(),selMonth,1).toISOString(),label:"📦 Estoque de insumos",sub:"Custo total dos materiais cadastrados",amount:totalInsumos,type:"saida",isInsumo:true});
     const deliveredMonth=state.orders.filter(o=>{
       if(o.status!=="entregue")return false;
       const d=new Date(o.deliveredAt||o.createdAt);
@@ -1993,6 +1997,40 @@ root.render(React.createElement(App));  </script>
     document.addEventListener('touchmove', function(e) {
       if (e.target === document.body) e.preventDefault();
     }, { passive: false });
+  </script>
+
+  <!-- Banner de atualização -->
+  <div id="update-banner" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    width:calc(100% - 32px);max-width:400px;background:#1C1018;border:1px solid #F06292;
+    border-radius:14px;padding:14px 16px;z-index:9999;align-items:center;justify-content:space-between;gap:12px;">
+    <span style="font-size:13px;color:#FFF0F5;">🆕 Nova versão disponível!</span>
+    <button id="btn-update" style="background:#F06292;color:#fff;border:none;border-radius:9px;
+      padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Atualizar</button>
+  </div>
+
+  <script>
+  if ('serviceWorker' in navigator) {
+    let newWorker;
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Nova versão disponível — mostra banner
+            document.getElementById('update-banner').style.display = 'flex';
+          }
+        });
+      });
+    });
+
+    document.getElementById('btn-update').addEventListener('click', () => {
+      if (newWorker) newWorker.postMessage('skipWaiting');
+    });
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  }
   </script>
 </body>
 </html>
