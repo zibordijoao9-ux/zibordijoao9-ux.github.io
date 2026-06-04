@@ -23,8 +23,6 @@
 </head>
 <body>
   <div id="root"></div>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -45,10 +43,6 @@ const MONTHS_F=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","A
 const CAT_L={materia_prima:"Matéria-Prima",embalagem:"Embalagem",ferramentas:"Ferramentas",marketing:"Marketing",transporte:"Transporte",outros:"Outros"};
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-const fbApp=firebase.initializeApp({apiKey:"AIzaSyBmUDNJebQ2sDQKBj7UVQiYhmE-fo_TYAs",authDomain:"jb-manager-4b5a9.firebaseapp.com",projectId:"jb-manager-4b5a9",storageBucket:"jb-manager-4b5a9.firebasestorage.app",messagingSenderId:"594262100196",appId:"1:594262100196:web:6ed3cba4092e1820f904f1"});
-const db=firebase.firestore(fbApp);
-const FB_DOC=db.collection("appData").doc("main");
-const stripPhotos=s=>({...s,products:(s.products||[]).map(p=>({...p,photo:undefined})),materials:(s.materials||[]).map(m=>({...m,photo:undefined}))});
 const mergePhotos=(remote,local)=>({...remote,products:(remote.products||[]).map(p=>({...p,photo:local?.products?.find(lp=>lp.id===p.id)?.photo||null})),materials:(remote.materials||[]).map(m=>({...m,photo:local?.materials?.find(lm=>lm.id===m.id)?.photo||null}))});
 const fmtR=n=>`R$ ${Number(n||0).toFixed(2)}`;
 const fmtD=iso=>new Date(iso).toLocaleDateString("pt-BR");
@@ -334,6 +328,23 @@ const DEMO={
     {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
     {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
   ]},
+  {id:"p23",name:"Caneca Jumbo",category:"Caneca",price:0,productionCost:32.54,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m22",materialName:"Canecão",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:6,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m05",materialName:"Balão",qty:1,unit:"un"},
+  ]},
+  {id:"p24",name:"Kit Azulejo Duplo",category:"Kit Azulejo",price:75,productionCost:31.6,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m04",materialName:"Azulejo",qty:2,unit:"un"},
+    {materialId:"m16",materialName:"Caixa Azulejo + suporte",qty:2,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:2,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:2,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+  ]},
 ],
   materials:[
   {id:"m01",name:"A3",category:"Impressão",quantity:50,unit:"un",totalCost:142,minStock:10},
@@ -392,6 +403,8 @@ const DEMO={
   {id:"m54",name:"Barra de chocolate",category:"Alimentos",quantity:10,unit:"un",totalCost:74.9,minStock:3},
   {id:"m55",name:"Bala fini",category:"Alimentos",quantity:20,unit:"un",totalCost:66.8,minStock:5},
   {id:"m56",name:"A3 parzinho",category:"Impressão",quantity:20,unit:"un",totalCost:113.6,minStock:5},
+  {id:"m57",name:"Dourado (fita)",category:"Acabamento",quantity:20,unit:"un",totalCost:32,minStock:5},
+  {id:"m58",name:"Celofone P",category:"Acabamento",quantity:20,unit:"un",totalCost:14,minStock:5},
 ],
   purchases:[],
   orders:[],
@@ -1861,64 +1874,27 @@ function MaisTab({state,actions}){
 // ── MAIN APP ────────────────────────────────────────────────────────────────
 function App(){
   const [tab,setTab]=useState("painel");
-  const [state,setState]=useState(null);
-  const [syncing,setSyncing]=useState(false);
-  const isRemoteUpdate=React.useRef(false);
-  const firestoreReady=React.useRef(false);
-  const saveTimer=React.useRef(null);
-
-  useEffect(()=>{
-    let localState=null,localTs=0;
-    try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);localTs=parseInt(localStorage.getItem("gestao_v2_ts")||"0");}catch{}
-    // Mostra dados locais imediatamente — nunca trava
-    setState(localState?{...DEMO,...localState}:DEMO);
-
-    const unsub=FB_DOC.onSnapshot({includeMetadataChanges:true},snap=>{
-      if(snap.metadata.hasPendingWrites)return; // write nosso voltando, ignorar
-      if(snap.exists()){
-        const remote=snap.data();
-        const rTs=remote._ts||0;
-        if(rTs>=localTs){
-          // Firestore mais recente — usa e salva local
-          isRemoteUpdate.current=true;
-          setState(prev=>{
-            const merged=mergePhotos(remote,prev||localState);
-            try{localStorage.setItem("gestao_v2",JSON.stringify(merged));localStorage.setItem("gestao_v2_ts",String(rTs));localTs=rTs;}catch{}
-            return{...DEMO,...merged};
-          });
-        } else if(localState){
-          // Local mais recente — sobe pro Firestore
-          const ts=Date.now();
-          FB_DOC.set({...stripPhotos(localState),_ts:ts}).catch(()=>{});
-          try{localStorage.setItem("gestao_v2_ts",String(ts));}catch{}
-        }
-      }else{
-        // Firestore vazio — sobe local
-        const ts=Date.now();
-        FB_DOC.set({...stripPhotos(localState||DEMO),_ts:ts}).catch(()=>{});
-        try{localStorage.setItem("gestao_v2_ts",String(ts));}catch{}
-      }
-      firestoreReady.current=true;
-    },err=>{console.warn("Firestore:",err);firestoreReady.current=true;});
-
-    const t=setTimeout(()=>{firestoreReady.current=true;},5000);
-    return()=>{unsub();clearTimeout(t);};
-  },[]);
+  // Carrega estado: usa DEMO como base de produtos/insumos, preserva dados do usuário (pedidos, clientes, compras, metas)
+  const [state,setState]=useState(()=>{
+    let saved=null;
+    try{const raw=localStorage.getItem("gestao_v2");if(raw)saved=JSON.parse(raw);}catch{}
+    if(!saved) return DEMO;
+    // Sempre usa products, materials e categories do DEMO (fonte de verdade do HTML)
+    // Preserva apenas dados dinâmicos do usuário
+    return {
+      ...DEMO,
+      orders: saved.orders||[],
+      clients: saved.clients||[],
+      suppliers: saved.suppliers||[],
+      purchases: saved.purchases||[],
+      goals: saved.goals||[],
+      customExpenseCategories: saved.customExpenseCategories||[],
+    };
+  });
 
   useEffect(()=>{
     if(!state)return;
-    // Sempre salva localStorage imediatamente
     try{localStorage.setItem("gestao_v2",JSON.stringify(state));}catch{}
-    // Não salva Firestore se veio de lá (loop) ou antes de ler
-    if(isRemoteUpdate.current){isRemoteUpdate.current=false;return;}
-    if(!firestoreReady.current)return;
-    clearTimeout(saveTimer.current);
-    setSyncing(true);
-    saveTimer.current=setTimeout(()=>{
-      const ts=Date.now();
-      try{localStorage.setItem("gestao_v2_ts",String(ts));}catch{}
-      FB_DOC.set({...stripPhotos(state),_ts:ts}).then(()=>setSyncing(false)).catch(()=>setSyncing(false));
-    },1500);
   },[state]);
 
   if(!state)return(
@@ -1987,7 +1963,7 @@ function App(){
       <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
         {renderTab()}
       </div>
-      {syncing&&<div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:200,background:C.p,color:"#fff",fontSize:11,textAlign:"center",padding:"3px 0",fontWeight:600}}>☁️ Sincronizando...</div>}
+
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",
         maxWidth:430,background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:100}}>
         {tabs.map(t=>(
