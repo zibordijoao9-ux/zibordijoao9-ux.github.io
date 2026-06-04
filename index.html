@@ -45,86 +45,357 @@ const MONTHS_F=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","A
 const CAT_L={materia_prima:"Matéria-Prima",embalagem:"Embalagem",ferramentas:"Ferramentas",marketing:"Marketing",transporte:"Transporte",outros:"Outros"};
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-
-// ── Firebase Setup ──────────────────────────────────────────────────────────
-const FB_CONFIG={
-  apiKey:"AIzaSyBmUDNJebQ2sDQKBj7UVQiYhmE-fo_TYAs",
-  authDomain:"jb-manager-4b5a9.firebaseapp.com",
-  projectId:"jb-manager-4b5a9",
-  storageBucket:"jb-manager-4b5a9.firebasestorage.app",
-  messagingSenderId:"594262100196",
-  appId:"1:594262100196:web:6ed3cba4092e1820f904f1"
-};
-const fbApp=firebase.initializeApp(FB_CONFIG);
+const fbApp=firebase.initializeApp({apiKey:"AIzaSyBmUDNJebQ2sDQKBj7UVQiYhmE-fo_TYAs",authDomain:"jb-manager-4b5a9.firebaseapp.com",projectId:"jb-manager-4b5a9",storageBucket:"jb-manager-4b5a9.firebasestorage.app",messagingSenderId:"594262100196",appId:"1:594262100196:web:6ed3cba4092e1820f904f1"});
 const db=firebase.firestore(fbApp);
 const FB_DOC=db.collection("appData").doc("main");
-
-// Remove fotos antes de salvar no Firestore (evita exceder 1MB)
-const stripPhotos=s=>({...s,
-  products:s.products.map(p=>({...p,photo:undefined})),
-  materials:s.materials.map(m=>({...m,photo:undefined})),
-});
-// Restaura fotos locais após carregar do Firestore
-const mergePhotos=(remote,local)=>({...remote,
-  products:remote.products.map(p=>({...p,photo:local?.products?.find(lp=>lp.id===p.id)?.photo||null})),
-  materials:remote.materials.map(m=>({...m,photo:local?.materials?.find(lm=>lm.id===m.id)?.photo||null})),
-});
+const stripPhotos=s=>({...s,products:(s.products||[]).map(p=>({...p,photo:undefined})),materials:(s.materials||[]).map(m=>({...m,photo:undefined}))});
+const mergePhotos=(remote,local)=>({...remote,products:(remote.products||[]).map(p=>({...p,photo:local?.products?.find(lp=>lp.id===p.id)?.photo||null})),materials:(remote.materials||[]).map(m=>({...m,photo:local?.materials?.find(lm=>lm.id===m.id)?.photo||null}))});
 const fmtR=n=>`R$ ${Number(n||0).toFixed(2)}`;
 const fmtD=iso=>new Date(iso).toLocaleDateString("pt-BR");
 const isoNow=()=>new Date().toISOString();
 
 const DEMO={
-  productCategories:["Laços","Tiaras","Kits","Customizados","Outros"],
-  materialCategories:["Fitas","Tecidos","Fixadores","Acessórios"],
+  productCategories:["Festa na Caneca","Kit Azulejo","Kit Namorados","Kit Parzinho","Caneca"],
+  materialCategories:["Impressão","Alimentos","Embalagem","Brinde","Acabamento","Decoração","Utensílio","Suporte"],
   customExpenseCategories:[],
-  clients:[
-    {id:"c1",name:"Ana Silva",phone:"(11) 99999-1111",email:""},
-    {id:"c2",name:"Beatriz Santos",phone:"(11) 98888-2222",email:""},
-    {id:"c3",name:"Carla Mendes",phone:"(11) 97777-3333",email:""},
-  ],
-  suppliers:[{id:"s1",name:"Armarinhos Central",phone:"",category:"materia_prima"}],
+  clients:[],
+  suppliers:[],
   products:[
-    {id:"p1",name:"Laço de Cetim P",price:25,productionCost:8,stock:12,reserved:2,category:"Laços",materials:[]},
-    {id:"p2",name:"Tiara Floral",price:45,productionCost:15,stock:5,reserved:1,category:"Tiaras",materials:[]},
-    {id:"p3",name:"Kit Customizado",price:80,productionCost:25,stock:3,reserved:0,category:"Kits",materials:[]},
-    {id:"p4",name:"Laço GG Veludo",price:35,productionCost:10,stock:8,reserved:0,category:"Laços",materials:[]},
-  ],
+  {id:"p01",name:"Kit Azulejo 1",category:"Kit Azulejo",price:50,productionCost:15.63,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m04",materialName:"Azulejo",qty:1,unit:"un"},
+    {materialId:"m16",materialName:"Caixa Azulejo + suporte",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:2,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+  ]},
+  {id:"p02",name:"Caneca Personalizada",category:"Caneca",price:35,productionCost:17.62,stock:10,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+  ]},
+  {id:"p03",name:"Festa na Caneca 1",category:"Festa na Caneca",price:35,productionCost:18.42,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+  ]},
+  {id:"p04",name:"Festa na Caneca 2",category:"Festa na Caneca",price:47,productionCost:25.49,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+  ]},
+  {id:"p05",name:"Festa na Caneca 3",category:"Festa na Caneca",price:56,productionCost:31.81,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+    {materialId:"m30",materialName:"Flor",qty:1,unit:"un"},
+    {materialId:"m25",materialName:"Chaveiro",qty:1,unit:"un"},
+  ]},
+  {id:"p06",name:"Festa na Caneca 4",category:"Festa na Caneca",price:65,productionCost:34.43,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m30",materialName:"Flor",qty:1,unit:"un"},
+    {materialId:"m25",materialName:"Chaveiro",qty:1,unit:"un"},
+    {materialId:"m07",materialName:"Bandeja coração 26x18",qty:1,unit:"un"},
+  ]},
+  {id:"p07",name:"Festa na Caneca 5",category:"Festa na Caneca",price:50,productionCost:27.5,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m30",materialName:"Flor",qty:1,unit:"un"},
+    {materialId:"m25",materialName:"Chaveiro",qty:1,unit:"un"},
+  ]},
+  {id:"p08",name:"Festa na Caneca 6",category:"Festa na Caneca",price:60,productionCost:34.34,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m30",materialName:"Flor",qty:1,unit:"un"},
+    {materialId:"m25",materialName:"Chaveiro",qty:1,unit:"un"},
+    {materialId:"m15",materialName:"Bombom ferreiro",qty:1,unit:"un"},
+    {materialId:"m05",materialName:"Balão",qty:1,unit:"un"},
+  ]},
+  {id:"p09",name:"Festa na Caneca 7",category:"Festa na Caneca",price:70,productionCost:30.64,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m30",materialName:"Flor",qty:1,unit:"un"},
+    {materialId:"m25",materialName:"Chaveiro",qty:1,unit:"un"},
+    {materialId:"m15",materialName:"Bombom ferreiro",qty:1,unit:"un"},
+    {materialId:"m05",materialName:"Balão",qty:1,unit:"un"},
+    {materialId:"m03",materialName:"Amarrilho",qty:1,unit:"un"},
+  ]},
+  {id:"p10",name:"Festa na Caneca 8",category:"Festa na Caneca",price:40,productionCost:21.51,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m20",materialName:"Caneca oxf",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m47",materialName:"Sacola kraft pp",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+    {materialId:"m25",materialName:"Chaveiro",qty:1,unit:"un"},
+  ]},
+  {id:"p11",name:"Festa na Caneca 9",category:"Festa na Caneca",price:56,productionCost:30.59,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m20",materialName:"Caneca oxf",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m47",materialName:"Sacola kraft pp",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m13",materialName:"Bolinho",qty:1,unit:"un"},
+    {materialId:"m51",materialName:"Torrada",qty:1,unit:"un"},
+    {materialId:"m23",materialName:"Capuccino",qty:1,unit:"un"},
+    {materialId:"m33",materialName:"Geleia",qty:1,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+  ]},
+  {id:"p12",name:"Festa na Caneca 10",category:"Festa na Caneca",price:60,productionCost:33.09,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m20",materialName:"Caneca oxf",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m47",materialName:"Sacola kraft pp",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m43",materialName:"Poli sujinho",qty:1,unit:"un"},
+    {materialId:"m35",materialName:"Kitkat",qty:1,unit:"un"},
+    {materialId:"m26",materialName:"Chocolate quente",qty:1,unit:"un"},
+    {materialId:"m30",materialName:"Flor",qty:1,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+  ]},
+  {id:"p13",name:"Kit 1 - Dia dos Namorados",category:"Kit Namorados",price:76,productionCost:38.18,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m26",materialName:"Chocolate quente",qty:1,unit:"un"},
+    {materialId:"m35",materialName:"Kitkat",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m44",materialName:"Preto (fita)",qty:1,unit:"un"},
+    {materialId:"m07",materialName:"Bandeja coração 26x18",qty:1,unit:"un"},
+  ]},
+  {id:"p14",name:"Kit 2 - Dia dos Namorados",category:"Kit Namorados",price:67.9,productionCost:33.61,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m26",materialName:"Chocolate quente",qty:1,unit:"un"},
+    {materialId:"m35",materialName:"Kitkat",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m24",materialName:"Celofone",qty:1,unit:"un"},
+    {materialId:"m07",materialName:"Bandeja coração 26x18",qty:1,unit:"un"},
+  ]},
+  {id:"p15",name:"Kit 3 - Dia dos Namorados",category:"Kit Namorados",price:65,productionCost:34.34,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m26",materialName:"Chocolate quente",qty:1,unit:"un"},
+    {materialId:"m35",materialName:"Kitkat",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m22",materialName:"Canecão",qty:1,unit:"un"},
+  ]},
+  {id:"p16",name:"Kit 4 - Dia dos Namorados",category:"Kit Namorados",price:75,productionCost:37.62,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m20",materialName:"Caneca oxf",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m11",materialName:"Bolacha leite",qty:1,unit:"un"},
+    {materialId:"m51",materialName:"Torrada",qty:1,unit:"un"},
+    {materialId:"m23",materialName:"Capuccino",qty:1,unit:"un"},
+    {materialId:"m33",materialName:"Geleia",qty:1,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m45",materialName:"Roll",qty:1,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m44",materialName:"Preto (fita)",qty:1,unit:"un"},
+    {materialId:"m07",materialName:"Bandeja coração 26x18",qty:1,unit:"un"},
+  ]},
+  {id:"p17",name:"Kit 5 - Dia dos Namorados",category:"Kit Namorados",price:83,productionCost:41.37,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m20",materialName:"Caneca oxf",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m26",materialName:"Chocolate quente",qty:1,unit:"un"},
+    {materialId:"m35",materialName:"Kitkat",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m44",materialName:"Preto (fita)",qty:1,unit:"un"},
+    {materialId:"m07",materialName:"Bandeja coração 26x18",qty:1,unit:"un"},
+  ]},
+  {id:"p18",name:"Kit 6 - Dia dos Namorados",category:"Kit Namorados",price:110,productionCost:58.82,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m20",materialName:"Caneca oxf",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m27",materialName:"Colher",qty:1,unit:"un"},
+    {materialId:"m26",materialName:"Chocolate quente",qty:1,unit:"un"},
+    {materialId:"m35",materialName:"Kitkat",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:3,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m24",materialName:"Celofone",qty:1,unit:"un"},
+    {materialId:"m06",materialName:"Bandeja 22x22 coração",qty:1,unit:"un"},
+    {materialId:"m45",materialName:"Roll",qty:1,unit:"un"},
+    {materialId:"m54",materialName:"Barra de chocolate",qty:1,unit:"un"},
+    {materialId:"m55",materialName:"Bala fini",qty:1,unit:"un"},
+    {materialId:"m23",materialName:"Capuccino",qty:1,unit:"un"},
+    {materialId:"m28",materialName:"Descanso",qty:1,unit:"un"},
+    {materialId:"m02",materialName:"A4",qty:1,unit:"un"},
+  ]},
+  {id:"p19",name:"Kit Parzinho 1",category:"Kit Parzinho",price:80,productionCost:44.83,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m18",materialName:"Caneca",qty:2,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:2,unit:"un"},
+    {materialId:"m31",materialName:"Folha sublimação",qty:2,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:2,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m44",materialName:"Preto (fita)",qty:1,unit:"un"},
+    {materialId:"m08",materialName:"Bandeja frisada",qty:1,unit:"un"},
+  ]},
+  {id:"p20",name:"Caneca Parzinho",category:"Kit Parzinho",price:95,productionCost:50.83,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m21",materialName:"Caneca par",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m56",materialName:"A3 parzinho",qty:2,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:2,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m14",materialName:"Bombom",qty:6,unit:"un"},
+    {materialId:"m42",materialName:"Poli dourado",qty:1,unit:"un"},
+    {materialId:"m48",materialName:"Saquinho",qty:1,unit:"un"},
+    {materialId:"m36",materialName:"Laço G",qty:1,unit:"un"},
+    {materialId:"m44",materialName:"Preto (fita)",qty:1,unit:"un"},
+    {materialId:"m41",materialName:"Palha",qty:1,unit:"un"},
+    {materialId:"m10",materialName:"Bandeja frisada P",qty:1,unit:"un"},
+  ]},
+  {id:"p21",name:"Caneca Parzinho + Xícara",category:"Kit Parzinho",price:35,productionCost:16.36,stock:3,reserved:0,photo:null,recipe:[
+    {materialId:"m21",materialName:"Caneca par",qty:1,unit:"un"},
+    {materialId:"m53",materialName:"Xicara",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:2,unit:"un"},
+    {materialId:"m56",materialName:"A3 parzinho",qty:1,unit:"un"},
+    {materialId:"m46",materialName:"Sacola kraft P",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+  ]},
+  {id:"p22",name:"Caneca Oxford Personalizada",category:"Caneca",price:40,productionCost:21.51,stock:5,reserved:0,photo:null,recipe:[
+    {materialId:"m20",materialName:"Caneca oxf",qty:1,unit:"un"},
+    {materialId:"m50",materialName:"Tag",qty:1,unit:"un"},
+    {materialId:"m01",materialName:"A3",qty:1,unit:"un"},
+    {materialId:"m47",materialName:"Sacola kraft pp",qty:1,unit:"un"},
+    {materialId:"m37",materialName:"Laço m",qty:1,unit:"un"},
+    {materialId:"m17",materialName:"Caixinha",qty:1,unit:"un"},
+  ]},
+],
   materials:[
-    {id:"m1",name:"Fita de Cetim 2cm",category:"Fitas",quantity:50,unit:"m",totalCost:75,minStock:10},
-    {id:"m2",name:"Cola Termofusível",category:"Fixadores",quantity:3,unit:"un",totalCost:45,minStock:5},
-    {id:"m3",name:"Arco Plástico",category:"Acessórios",quantity:20,unit:"un",totalCost:40,minStock:5},
-    {id:"m4",name:"Veludo 1m",category:"Tecidos",quantity:8,unit:"m",totalCost:96,minStock:3},
-  ],
-  purchases:[
-    {id:"pu1",description:"Fitas sortidas",category:"materia_prima",amount:75,date:new Date(Date.now()-86400000*3).toISOString(),supplierName:"Armarinhos Central",notes:""},
-    {id:"pu2",description:"Cola termofusível 50un",category:"materia_prima",amount:45,date:new Date(Date.now()-86400000*7).toISOString(),supplierName:"",notes:""},
-    {id:"pu3",description:"Embalagens kraft",category:"embalagem",amount:60,date:new Date(Date.now()-86400000*10).toISOString(),supplierName:"",notes:""},
-  ],
-  orders:[
-    {id:"o1",clientId:"c1",clientName:"Ana Silva",clientPhone:"(11) 99999-1111",
-     items:[{productId:"p1",productName:"Laço de Cetim P",quantity:3,price:25,notes:"Cor rosa",components:[]}],
-     status:"pendente",total:75,totalFinal:75,discount:0,paymentMethod:"pix",
-     notes:"",createdAt:new Date(Date.now()-86400000*2).toISOString()},
-    {id:"o2",clientId:"c2",clientName:"Beatriz Santos",clientPhone:"(11) 98888-2222",
-     items:[{productId:"p2",productName:"Tiara Floral",quantity:2,price:45,notes:"Cor lilás",components:[]}],
-     status:"producao",total:90,totalFinal:90,discount:0,paymentMethod:"dinheiro",
-     notes:"Urgente",createdAt:new Date(Date.now()-86400000*5).toISOString()},
-    {id:"o3",clientId:"c3",clientName:"Carla Mendes",clientPhone:"",
-     items:[{productId:"p3",productName:"Kit Customizado",quantity:1,price:80,notes:"",components:[]}],
-     status:"entregue",total:80,totalFinal:80,discount:0,paymentMethod:"pix",
-     notes:"",createdAt:new Date(Date.now()-86400000*15).toISOString(),
-     deliveredAt:new Date(Date.now()-86400000*10).toISOString(),paymentReceivedAt:new Date().toISOString()},
-    {id:"o4",clientId:"c1",clientName:"Ana Silva",clientPhone:"(11) 99999-1111",
-     items:[{productId:"p1",productName:"Laço de Cetim P",quantity:5,price:25,notes:"",components:[]},
-            {productId:"p4",productName:"Laço GG Veludo",quantity:2,price:35,notes:"",components:[]}],
-     status:"entregue",total:195,totalFinal:190,discount:5,paymentMethod:"cartao",
-     notes:"",createdAt:new Date(Date.now()-86400000*20).toISOString(),
-     deliveredAt:new Date(Date.now()-86400000*8).toISOString()},
-  ],
-  goals:[
-    {id:"g1",type:"faturamento",title:"Meta de Faturamento",target:1000,month:new Date().getMonth(),year:new Date().getFullYear()},
-    {id:"g2",type:"vendas",title:"Meta de Vendas",target:10,month:new Date().getMonth(),year:new Date().getFullYear()},
-  ],
+  {id:"m01",name:"A3",category:"Impressão",quantity:50,unit:"un",totalCost:142,minStock:10},
+  {id:"m02",name:"A4",category:"Impressão",quantity:100,unit:"un",totalCost:56,minStock:20},
+  {id:"m03",name:"Amarrilho",category:"Acabamento",quantity:200,unit:"un",totalCost:4,minStock:50},
+  {id:"m04",name:"Azulejo",category:"Suporte",quantity:20,unit:"un",totalCost:104.2,minStock:5},
+  {id:"m05",name:"Balão",category:"Decoração",quantity:50,unit:"un",totalCost:26.5,minStock:10},
+  {id:"m06",name:"Bandeja 22x22 coração",category:"Embalagem",quantity:10,unit:"un",totalCost:55,minStock:3},
+  {id:"m07",name:"Bandeja coração 26x18",category:"Embalagem",quantity:10,unit:"un",totalCost:59,minStock:3},
+  {id:"m08",name:"Bandeja frisada",category:"Embalagem",quantity:10,unit:"un",totalCost:69,minStock:3},
+  {id:"m09",name:"Bandeja frisada M",category:"Embalagem",quantity:5,unit:"un",totalCost:49.5,minStock:2},
+  {id:"m10",name:"Bandeja frisada P",category:"Embalagem",quantity:10,unit:"un",totalCost:85,minStock:3},
+  {id:"m11",name:"Bolacha leite",category:"Alimentos",quantity:30,unit:"un",totalCost:23.7,minStock:10},
+  {id:"m12",name:"Bolacha maisena",category:"Alimentos",quantity:30,unit:"un",totalCost:23.7,minStock:10},
+  {id:"m13",name:"Bolinho",category:"Alimentos",quantity:20,unit:"un",totalCost:48.2,minStock:5},
+  {id:"m14",name:"Bombom",category:"Alimentos",quantity:50,unit:"un",totalCost:80,minStock:10},
+  {id:"m15",name:"Bombom ferreiro",category:"Alimentos",quantity:20,unit:"un",totalCost:55,minStock:5},
+  {id:"m16",name:"Caixa Azulejo + suporte",category:"Embalagem",quantity:10,unit:"un",totalCost:35,minStock:3},
+  {id:"m17",name:"Caixinha",category:"Embalagem",quantity:100,unit:"un",totalCost:80,minStock:20},
+  {id:"m18",name:"Caneca",category:"Brinde",quantity:30,unit:"un",totalCost:391.5,minStock:5},
+  {id:"m19",name:"Caneca alça colorida",category:"Brinde",quantity:10,unit:"un",totalCost:130.9,minStock:3},
+  {id:"m20",name:"Caneca oxf",category:"Brinde",quantity:10,unit:"un",totalCost:159,minStock:3},
+  {id:"m21",name:"Caneca par",category:"Brinde",quantity:10,unit:"un",totalCost:199,minStock:3},
+  {id:"m22",name:"Canecão",category:"Brinde",quantity:5,unit:"un",totalCost:84.5,minStock:2},
+  {id:"m23",name:"Capuccino",category:"Alimentos",quantity:20,unit:"un",totalCost:51.8,minStock:5},
+  {id:"m24",name:"Celofone",category:"Acabamento",quantity:20,unit:"un",totalCost:14,minStock:5},
+  {id:"m25",name:"Chaveiro",category:"Brinde",quantity:20,unit:"un",totalCost:77.8,minStock:5},
+  {id:"m26",name:"Chocolate quente",category:"Alimentos",quantity:20,unit:"un",totalCost:56.8,minStock:5},
+  {id:"m27",name:"Colher",category:"Utensílio",quantity:30,unit:"un",totalCost:68.1,minStock:5},
+  {id:"m28",name:"Descanso",category:"Brinde",quantity:10,unit:"un",totalCost:15.3,minStock:3},
+  {id:"m29",name:"Fini beijinho",category:"Alimentos",quantity:20,unit:"un",totalCost:66.8,minStock:5},
+  {id:"m30",name:"Flor",category:"Decoração",quantity:20,unit:"un",totalCost:43.6,minStock:5},
+  {id:"m31",name:"Folha sublimação",category:"Impressão",quantity:50,unit:"un",totalCost:125,minStock:10},
+  {id:"m32",name:"Fominha",category:"Decoração",quantity:50,unit:"un",totalCost:14.5,minStock:10},
+  {id:"m33",name:"Geleia",category:"Alimentos",quantity:30,unit:"un",totalCost:17.1,minStock:5},
+  {id:"m34",name:"Haste",category:"Decoração",quantity:100,unit:"un",totalCost:28,minStock:20},
+  {id:"m35",name:"Kitkat",category:"Alimentos",quantity:20,unit:"un",totalCost:66.8,minStock:5},
+  {id:"m36",name:"Laço G",category:"Acabamento",quantity:50,unit:"un",totalCost:35.5,minStock:10},
+  {id:"m37",name:"Laço m",category:"Acabamento",quantity:100,unit:"un",totalCost:53,minStock:20},
+  {id:"m38",name:"Laço p",category:"Acabamento",quantity:100,unit:"un",totalCost:21,minStock:20},
+  {id:"m39",name:"Macarrão",category:"Decoração",quantity:50,unit:"un",totalCost:15,minStock:10},
+  {id:"m40",name:"Nutela",category:"Alimentos",quantity:10,unit:"un",totalCost:89,minStock:3},
+  {id:"m41",name:"Palha",category:"Utensílio",quantity:100,unit:"un",totalCost:25,minStock:20},
+  {id:"m42",name:"Poli dourado",category:"Acabamento",quantity:50,unit:"un",totalCost:40,minStock:10},
+  {id:"m43",name:"Poli sujinho",category:"Acabamento",quantity:50,unit:"un",totalCost:35,minStock:10},
+  {id:"m44",name:"Preto (fita)",category:"Acabamento",quantity:50,unit:"un",totalCost:32.5,minStock:10},
+  {id:"m45",name:"Roll",category:"Alimentos",quantity:20,unit:"un",totalCost:45.8,minStock:5},
+  {id:"m46",name:"Sacola kraft P",category:"Embalagem",quantity:50,unit:"un",totalCost:69.5,minStock:10},
+  {id:"m47",name:"Sacola kraft pp",category:"Embalagem",quantity:50,unit:"un",totalCost:64.5,minStock:10},
+  {id:"m48",name:"Saquinho",category:"Embalagem",quantity:50,unit:"un",totalCost:46,minStock:10},
+  {id:"m49",name:"Suflair",category:"Alimentos",quantity:20,unit:"un",totalCost:100,minStock:5},
+  {id:"m50",name:"Tag",category:"Acabamento",quantity:200,unit:"un",totalCost:30,minStock:30},
+  {id:"m51",name:"Torrada",category:"Alimentos",quantity:30,unit:"un",totalCost:29.7,minStock:5},
+  {id:"m52",name:"Wafer",category:"Alimentos",quantity:20,unit:"un",totalCost:45.8,minStock:5},
+  {id:"m53",name:"Xicara",category:"Utensílio",quantity:10,unit:"un",totalCost:39.9,minStock:3},
+  {id:"m54",name:"Barra de chocolate",category:"Alimentos",quantity:10,unit:"un",totalCost:74.9,minStock:3},
+  {id:"m55",name:"Bala fini",category:"Alimentos",quantity:20,unit:"un",totalCost:66.8,minStock:5},
+  {id:"m56",name:"A3 parzinho",category:"Impressão",quantity:20,unit:"un",totalCost:113.6,minStock:5},
+],
+  purchases:[],
+  orders:[],
+  goals:[],
 };
 
 function calcSummary(state,month,year){
@@ -1060,14 +1331,7 @@ function ProductFormModal({state,actions,editing,onClose}){
   const [showRecipePicker,setShowRecipePicker]=useState(false);
   const [recipeSearch,setRecipeSearch]=useState("");
   const [showDeleteCat,setShowDeleteCat]=useState(false);
-  const pN=parseFloat(price)||0;
-  const autoCost=recipe.reduce((t,r)=>{
-    const mat=state.materials.find(m=>m.id===r.materialId);
-    if(!mat||!mat.quantity)return t;
-    const unitCost=(parseFloat(mat.totalCost)||0)/(parseFloat(mat.quantity)||1);
-    return t+(unitCost*(parseFloat(r.qty)||0));
-  },0);
-  const cN=autoCost>0?autoCost:(parseFloat(cost)||0);
+  const pN=parseFloat(price)||0;const cN=parseFloat(cost)||0;
   const m=pN>0&&cN>0?((pN-cN)/pN)*100:null;
   const mc=m?(m>=40?C.green:m>=20?C.amber:C.red):null;
 
@@ -1121,10 +1385,7 @@ function ProductFormModal({state,actions,editing,onClose}){
         </div>}
       </div>
       <Input label="Preço de venda (R$)" value={price} onChange={setPrice} type="number" placeholder="0.00"/>
-      <Input label="Custo de produção manual (opcional)" value={cost} onChange={setCost} type="number" placeholder="Usado apenas se não houver ficha técnica"/>
-      <div style={{background:C.acc,border:`1px solid ${C.p}44`,borderRadius:10,padding:10,color:C.fg,fontSize:13}}>
-        💰 Custo automático calculado pelos insumos: {fmtR(autoCost)}
-      </div>
+      <Input label="Custo de produção (R$)" value={cost} onChange={setCost} type="number" placeholder="0.00"/>
       {m!==null&&<div style={{display:"flex",alignItems:"center",gap:8,background:mc+"18",border:`1px solid ${mc}44`,borderRadius:10,padding:12}}>
         <span style={{fontSize:14,fontWeight:700,color:mc}}>📈 Margem: {m.toFixed(1)}%</span>
         <span style={{fontSize:12,color:mc+"AA"}}> · Lucro: {fmtR(pN-cN)}/un</span>
@@ -1325,14 +1586,22 @@ function ExtratoTab({state,actions}){
   const entries=useMemo(()=>{
     const saidas=state.purchases.filter(p=>{const d=new Date(p.date);return d.getMonth()===selMonth&&d.getFullYear()===now.getFullYear();})
       .map(p=>({id:p.id,date:p.date,label:p.description||"Gasto",sub:p.supplierName?"Forn: "+p.supplierName:CAT_L[p.category]||p.category,amount:p.amount,type:"saida",purchaseId:p.id}));
-    const entradas=state.orders.filter(o=>{
+    const deliveredMonth=state.orders.filter(o=>{
       if(o.status!=="entregue")return false;
       const d=new Date(o.deliveredAt||o.createdAt);
       return d.getMonth()===selMonth&&d.getFullYear()===now.getFullYear();
-    }).map(o=>({id:o.id,date:o.deliveredAt||o.createdAt,label:o.clientName,
-      sub:o.items.map(i=>`${i.quantity}x ${i.productName}`).join(", "),
+    });
+    const entradas=deliveredMonth.map(o=>({id:o.id,date:o.deliveredAt||o.createdAt,
+      label:o.clientName,sub:o.items.map(i=>`${i.quantity}x ${i.productName}`).join(", "),
       amount:o.totalFinal||o.total,type:"entrada"}));
-    return[...saidas,...entradas].sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const custosProd=deliveredMonth.flatMap(o=>{
+      const custo=o.items.reduce((s,i)=>{const p=state.products.find(p=>p.id===i.productId);return s+(p?.productionCost||0)*i.quantity;},0);
+      if(custo<=0)return[];
+      return[{id:"custo_"+o.id,date:o.deliveredAt||o.createdAt,label:"🏭 Custo de produção",
+        sub:o.clientName+" · "+o.items.map(i=>`${i.quantity}x ${i.productName}`).join(", "),
+        amount:custo,type:"saida",isCusto:true}];
+    });
+    return[...saidas,...custosProd,...entradas].sort((a,b)=>new Date(b.date)-new Date(a.date));
   },[state,selMonth]);
   const totalE=entries.filter(e=>e.type==="entrada").reduce((s,e)=>s+e.amount,0);
   const totalS=entries.filter(e=>e.type==="saida").reduce((s,e)=>s+e.amount,0);
@@ -1594,50 +1863,62 @@ function App(){
   const [tab,setTab]=useState("painel");
   const [state,setState]=useState(null);
   const [syncing,setSyncing]=useState(false);
-  const isRemote=React.useRef(false);
+  const isRemoteUpdate=React.useRef(false);
+  const firestoreReady=React.useRef(false);
   const saveTimer=React.useRef(null);
 
   useEffect(()=>{
-    // Carrega localStorage IMEDIATAMENTE - nunca trava na tela de loading
-    let localState=null;
-    try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);}catch{}
-    setState({...DEMO,...(localState||{})});
+    let localState=null,localTs=0;
+    try{const raw=localStorage.getItem("gestao_v2");if(raw)localState=JSON.parse(raw);localTs=parseInt(localStorage.getItem("gestao_v2_ts")||"0");}catch{}
+    // Mostra dados locais imediatamente — nunca trava
+    setState(localState?{...DEMO,...localState}:DEMO);
 
-    // Conecta Firestore em background para sincronizar
-    const unsub=FB_DOC.onSnapshot(snap=>{
+    const unsub=FB_DOC.onSnapshot({includeMetadataChanges:true},snap=>{
+      if(snap.metadata.hasPendingWrites)return; // write nosso voltando, ignorar
       if(snap.exists()){
-        isRemote.current=true;
-        setState(prev=>{
-          const remote=snap.data();
-          const base=prev||localState||DEMO;
-          const merged=mergePhotos({
-            ...remote,
-            materials:[...(remote.materials||[]), ...(base.materials||[]).filter(x=>!(remote.materials||[]).some(r=>r.id===x.id))],
-            products:[...(remote.products||[]), ...(base.products||[]).filter(x=>!(remote.products||[]).some(r=>r.id===x.id))],
-            purchases:[...(remote.purchases||[]), ...(base.purchases||[]).filter(x=>!(remote.purchases||[]).some(r=>r.id===x.id))]
-          },base);
-          try{localStorage.setItem("gestao_v2",JSON.stringify(merged));}catch{}
-          return{...DEMO,...merged};
-        });
+        const remote=snap.data();
+        const rTs=remote._ts||0;
+        if(rTs>=localTs){
+          // Firestore mais recente — usa e salva local
+          isRemoteUpdate.current=true;
+          setState(prev=>{
+            const merged=mergePhotos(remote,prev||localState);
+            try{localStorage.setItem("gestao_v2",JSON.stringify(merged));localStorage.setItem("gestao_v2_ts",String(rTs));localTs=rTs;}catch{}
+            return{...DEMO,...merged};
+          });
+        } else if(localState){
+          // Local mais recente — sobe pro Firestore
+          const ts=Date.now();
+          FB_DOC.set({...stripPhotos(localState),_ts:ts}).catch(()=>{});
+          try{localStorage.setItem("gestao_v2_ts",String(ts));}catch{}
+        }
       }else{
-        FB_DOC.set(stripPhotos(localState||DEMO)).catch(()=>{});
+        // Firestore vazio — sobe local
+        const ts=Date.now();
+        FB_DOC.set({...stripPhotos(localState||DEMO),_ts:ts}).catch(()=>{});
+        try{localStorage.setItem("gestao_v2_ts",String(ts));}catch{}
       }
-    },err=>console.warn("Firestore:",err));
-    return()=>unsub();
+      firestoreReady.current=true;
+    },err=>{console.warn("Firestore:",err);firestoreReady.current=true;});
+
+    const t=setTimeout(()=>{firestoreReady.current=true;},5000);
+    return()=>{unsub();clearTimeout(t);};
   },[]);
 
-  // Salva no Firestore ao mudar estado (debounce 1s, ignora updates remotos)
   useEffect(()=>{
     if(!state)return;
-    if(isRemote.current){isRemote.current=false;return;}
+    // Sempre salva localStorage imediatamente
     try{localStorage.setItem("gestao_v2",JSON.stringify(state));}catch{}
+    // Não salva Firestore se veio de lá (loop) ou antes de ler
+    if(isRemoteUpdate.current){isRemoteUpdate.current=false;return;}
+    if(!firestoreReady.current)return;
     clearTimeout(saveTimer.current);
     setSyncing(true);
     saveTimer.current=setTimeout(()=>{
-      FB_DOC.set(stripPhotos(state),{merge:true})
-        .then(()=>setSyncing(false))
-        .catch(()=>setSyncing(false));
-    },1000);
+      const ts=Date.now();
+      try{localStorage.setItem("gestao_v2_ts",String(ts));}catch{}
+      FB_DOC.set({...stripPhotos(state),_ts:ts}).then(()=>setSyncing(false)).catch(()=>setSyncing(false));
+    },1500);
   },[state]);
 
   if(!state)return(
@@ -1645,43 +1926,17 @@ function App(){
       justifyContent:"center",alignItems:"center",fontFamily:"system-ui,sans-serif",gap:12}}>
       <div style={{fontSize:32}}>📦</div>
       <div style={{fontSize:18,fontWeight:700,color:C.p}}>JB Manager</div>
-      <div style={{fontSize:13,color:C.mfg}}>Conectando...</div>
+      <div style={{fontSize:13,color:C.mfg}}>Carregando...</div>
     </div>
   );
 
   const update=fn=>setState(s=>fn({...s}));
-  const createExpenseFromProduct=(p,descPrefix="Estoque inicial produto")=>({
-    id:uid(),
-    description:`${descPrefix}: ${p.name}`,
-    category:"materia_prima",
-    amount:(Number(p.productionCost)||0)*(Number(p.stock)||0),
-    date:new Date().toISOString(),
-    supplierName:"",
-    notes:"Lançamento automático"
-  });
   const actions={
     addOrder:o=>update(s=>({...s,orders:[...s.orders,{...o,id:uid()}]})),
     updateOrder:(id,d)=>update(s=>({...s,orders:s.orders.map(o=>o.id===id?{...o,...d}:o)})),
     deleteOrder:id=>update(s=>({...s,orders:s.orders.filter(o=>o.id!==id)})),
-    addProduct:p=>update(s=>{
-      const np={...p,id:uid()};
-      const purchases=[...s.purchases];
-      const cost=(Number(np.productionCost)||0)*(Number(np.stock)||0);
-      if(cost>0)purchases.push(createExpenseFromProduct(np));
-      return {...s,products:[...s.products,np],purchases};
-    }),
-    updateProduct:(id,d)=>update(s=>{
-      const oldP=s.products.find(p=>p.id===id);
-      const updated={...oldP,...d};
-      const oldCost=(Number(oldP?.productionCost)||0)*(Number(oldP?.stock)||0);
-      const newCost=(Number(updated.productionCost)||0)*(Number(updated.stock)||0);
-      const diff=newCost-oldCost;
-      const purchases=[...s.purchases];
-      if(diff>0){
-        purchases.push({id:uid(),description:`Ajuste de estoque: ${updated.name}`,category:"materia_prima",amount:diff,date:new Date().toISOString(),supplierName:"",notes:"Lançamento automático"});
-      }
-      return {...s,products:s.products.map(p=>p.id===id?updated:p),purchases};
-    }),
+    addProduct:p=>update(s=>({...s,products:[...s.products,{...p,id:uid()}]})),
+    updateProduct:(id,d)=>update(s=>({...s,products:s.products.map(p=>p.id===id?{...p,...d}:p)})),
     deleteProduct:id=>update(s=>({...s,products:s.products.filter(p=>p.id!==id)})),
     addMaterial:m=>update(s=>({...s,materials:[...s.materials,{...m,id:uid()}]})),
     updateMaterial:(id,d)=>update(s=>({...s,materials:s.materials.map(m=>m.id===id?{...m,...d}:m)})),
@@ -1732,14 +1987,7 @@ function App(){
       <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
         {renderTab()}
       </div>
-      {syncing&&(
-        <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",
-          width:"100%",maxWidth:430,zIndex:200,pointerEvents:"none"}}>
-          <div style={{background:C.p,color:"#fff",fontSize:11,textAlign:"center",padding:"3px 0",fontWeight:600}}>
-            ☁️ Sincronizando...
-          </div>
-        </div>
-      )}
+      {syncing&&<div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:200,background:C.p,color:"#fff",fontSize:11,textAlign:"center",padding:"3px 0",fontWeight:600}}>☁️ Sincronizando...</div>}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",
         maxWidth:430,background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:100}}>
         {tabs.map(t=>(
